@@ -62,6 +62,17 @@
       <section class="card">
         <h2 class="card-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+            <polyline points="16 6 12 2 8 6"></polyline>
+            <line x1="12" x2="12" y1="2" y2="15"></line>
+          </svg>
+          <span>我要发送 / 发起分享</span>
+        </h2>
+        <p class="card-desc">创建专属 6 位房间码与二维码，邀请对端手机或电脑加入</p>
+
+        <!-- 未创建房间时的引导入口 -->
+        <div v-if="!currentRoomCode" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px 16px; border: 2px dashed var(--border-color); border-radius: var(--radius-md); margin-bottom: 20px; background: var(--bg-subtle);">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); margin-bottom: 12px;">
             <rect width="5" height="5" x="3" y="3" rx="1"></rect>
             <rect width="5" height="5" x="16" y="3" rx="1"></rect>
             <rect width="5" height="5" x="3" y="16" rx="1"></rect>
@@ -75,33 +86,42 @@
             <path d="M21 12v.01"></path>
             <path d="M12 21v-1"></path>
           </svg>
-          <span>扫码或分享加入</span>
-        </h2>
-        <p class="card-desc">用手机相机扫描二维码，或分享房间链接直接配对</p>
-
-        <div class="qr-container">
-          <canvas ref="qrCanvas" class="qr-canvas"></canvas>
-        </div>
-
-        <div class="room-pin-display">
-          <span class="room-pin-text">{{ currentRoomCode || '------' }}</span>
-          <button class="btn-copy" @click="copyJoinLink" title="复制加入链接">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
-              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
-            </svg>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">尚未开启分享房间</p>
+          <button class="btn btn-primary" style="width: auto; padding: 10px 24px;" @click="createNewRoom" :disabled="isConnecting">
+            <span v-if="isConnecting">正在生成房间...</span>
+            <span v-else>立即创建分享房间</span>
           </button>
         </div>
 
-        <button class="btn btn-outline" @click="createNewRoom" :disabled="isConnecting">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-            <path d="M21 3v5h-5"></path>
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-            <path d="M8 16H3v5"></path>
-          </svg>
-          <span>刷新房间号</span>
-        </button>
+        <!-- 已创建房间展示二维码与房间码 -->
+        <template v-else>
+          <div class="qr-container">
+            <canvas ref="qrCanvas" class="qr-canvas"></canvas>
+          </div>
+
+          <div class="room-pin-display">
+            <span class="room-pin-text">{{ currentRoomCode }}</span>
+            <button class="btn-copy" @click="copyJoinLink" title="复制加入链接">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+              </svg>
+            </button>
+          </div>
+
+          <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 16px;">
+            正在等待对端扫码或输码加入...
+          </p>
+
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-outline" @click="createNewRoom" :disabled="isConnecting">
+              <span>刷新房间号</span>
+            </button>
+            <button class="btn btn-outline" style="color: var(--danger);" @click="cancelCreatedRoom">
+              <span>关闭房间</span>
+            </button>
+          </div>
+        </template>
       </section>
 
       <!-- 卡片 2：输入房间码加入 -->
@@ -112,9 +132,14 @@
             <polyline points="10 17 15 12 10 7"></polyline>
             <line x1="15" x2="3" y1="12" y2="12"></line>
           </svg>
-          <span>加入已有房间</span>
+          <span>我要接收 / 加入房间</span>
         </h2>
         <p class="card-desc">输入对方屏幕上显示的 6 位房间码</p>
+
+        <!-- 扫码直达提示 -->
+        <div v-if="scannedFromUrl" style="background: var(--primary-subtle); color: var(--primary); padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 16px; border: 1px solid rgba(37,99,235,0.2);">
+          ✓ 已识别扫码房间码 <b>{{ scannedRoomCode }}</b>，核对下方设备名后点击加入
+        </div>
 
         <div class="pin-input-group">
           <input
@@ -133,7 +158,7 @@
 
         <button class="btn btn-primary" @click="joinRoomByPin" :disabled="!isPinComplete || isConnecting">
           <span v-if="isConnecting">正在连接信令...</span>
-          <span v-else>立即连接</span>
+          <span v-else>{{ scannedFromUrl ? '确认加入连接' : '立即连接' }}</span>
         </button>
 
         <div style="margin-top: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.6;">
@@ -730,6 +755,23 @@
           quickText.value = '';
         };
 
+        // 关闭自建房间
+        const cancelCreatedRoom = () => {
+          isExplicitlyDisconnected = true;
+          clearReconnectTimer();
+          stopWsHeartbeat();
+          if (ws) {
+            ws.onopen = null;
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
+            try { ws.close(); } catch (_) {}
+            ws = null;
+          }
+          currentRoomCode.value = '';
+          showToast('已关闭分享房间');
+        };
+
         // 断开连接
         const disconnectSession = () => {
           isExplicitlyDisconnected = true;
@@ -747,7 +789,7 @@
           }
           isConnected.value = false;
           isConnecting.value = false;
-          createNewRoom();
+          currentRoomCode.value = '';
           showToast('会话已结束');
         };
 
@@ -798,8 +840,11 @@
           return formatBytes(bytesPerSec) + '/s';
         };
 
+        const scannedFromUrl = ref(false);
+        const scannedRoomCode = ref('');
+
         onMounted(() => {
-          // 检查 URL 是否带 room 参数
+          // 检查 URL 是否带 room 参数（扫码进入）
           const urlParams = new URLSearchParams(window.location.search);
           const roomParam = urlParams.get('room');
           if (roomParam && roomParam.length === 6) {
@@ -807,11 +852,12 @@
             for (let i = 0; i < 6; i++) {
               pinDigits[i] = cleanCode[i] || '';
             }
+            scannedFromUrl.value = true;
+            scannedRoomCode.value = cleanCode;
             currentRoomCode.value = cleanCode;
-            connectSignaling(cleanCode, false);
-          } else {
-            createNewRoom();
+            // 扫码进入绝不自动连接，等待用户核实设备名后自主点击“确认加入连接”
           }
+          // 普通进入时绝不调用 createNewRoom()，实现 0 背景开销
         });
 
         return {
@@ -822,6 +868,9 @@
           currentRoomCode,
           qrCanvas,
           createNewRoom,
+          cancelCreatedRoom,
+          scannedFromUrl,
+          scannedRoomCode,
           copyJoinLink,
           pinDigits,
           pinInputs,
