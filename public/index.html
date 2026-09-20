@@ -369,91 +369,193 @@
             try { ws.close(); } catch (_) {}
           }
 
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}?peerId=${myPeerId.value}&deviceName=${encodeURIComponent(deviceName.value)}`;
+          let isExplicitlyDisconnected = false;
+          let wsHeartbeatInterval = null;
 
-          ws = new WebSocket(wsUrl);
-
-          rtc = new WebRTCManager({
-            sendSignal: (type, payload) => {
+          const startWsHeartbeat = () => {
+            stopWsHeartbeat();
+            wsHeartbeatInterval = setInterval(() => {
               if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(createSignalMessage(type, payload));
+                try {
+                  ws.send(createSignalMessage(SIGNAL_TYPES.PING, {}));
+                } catch (_) {}
               }
-            },
-            onConnected: () => {
-              isConnected.value = true;
-              showToast('WebRTC 直连建立成功！');
-            },
-            onDisconnected: () => {
-              isConnected.value = false;
-              showToast('对端已断开连接');
-            },
-            onTextMessage: (text) => {
-              try {
-                const data = JSON.parse(text);
-                if (data.action === 'file-meta') {
-                  handleIncomingFileMeta(data);
-                } else if (data.action === 'file-end') {
-                  handleIncomingFileEnd(data.fileId);
-                } else if (data.action === 'chat') {
-                  textMessages.value.push({ sender: peerDeviceName.value, text: data.text });
-                }
-              } catch (_) {
-                textMessages.value.push({ sender: peerDeviceName.value, text });
-              }
-            },
-            onBinaryMessage: (arrayBuffer) => {
-              handleIncomingChunk(arrayBuffer);
-            },
-          });
+            }, 20000);
+          };
 
-          ws.onmessage = async (event) => {
-            try {
-              const msg = parseSignalMessage(event.data);
-              switch (msg.type) {
-                case SIGNAL_TYPES.ROOM_STATE:
-                  if (msg.payload.peers && msg.payload.peers.length > 0) {
-                    peerDeviceName.value = msg.payload.peers[0].deviceName || '对端设备';
-                    // 房间内已有其他人，发起 WebRTC Offer
-                    await rtc.startAsInitiator();
-                  }
-                  break;
-
-                case SIGNAL_TYPES.PEER_JOINED:
-                  peerDeviceName.value = msg.payload.deviceName || '对端设备';
-                  showToast(`${peerDeviceName.value} 已扫码加入房间`);
-                  break;
-
-                case SIGNAL_TYPES.OFFER:
-                  await rtc.handleOffer(msg.payload);
-                  break;
-
-                case SIGNAL_TYPES.ANSWER:
-                  await rtc.handleAnswer(msg.payload);
-                  break;
-
-                case SIGNAL_TYPES.CANDIDATE:
-                  await rtc.handleCandidate(msg.payload.candidate);
-                  break;
-
-                case SIGNAL_TYPES.PEER_LEFT:
-                  showToast('对端已离开');
-                  isConnected.value = false;
-                  break;
-
-                case SIGNAL_TYPES.ERROR:
-                  showToast('信令错误：' + msg.payload.message);
-                  break;
-              }
-            } catch (err) {
-              console.error('Error handling signal message:', err);
+          const stopWsHeartbeat = () => {
+            if (wsHeartbeatInterval) {
+              clearInterval(wsHeartbeatInterval);
+              wsHeartbeatInterval = null;
             }
           };
 
-          ws.onerror = (e) => {
-            console.error('Signaling WebSocket error:', e);
+          // 移动端/桌面端屏幕防熄屏锁定
+          let wakeLockSentinel = null;
+          const acquireWakeLock = async () => {
+            try {
+              if ('wakeLock' in navigator && !wakeLockSentinel) {
+                wakeLockSentinel = await navigator.wakeLock.request('screen');
+                wakeLockSentinel.addEventListener('release', () => {
+                  wakeLockSentinel = null;
+                });
+              }
+            } catch (_) {}
           };
-        };
+
+          const releaseWakeLock = async () => {
+            if (wakeLockSentinel) {
+              try {
+                await wakeLockSentinel.release();
+              } catch (_) {}
+              wakeLockSentinel = null;
+            }
+          };
+
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && isConnected.value) {
+              acquireWakeLock();
+            }
+          });
+
+          // 信令通道连接 (支持断线自愈重连)
+          const connectSignaling = (roomId, isRoomCreator = false, isReconnect = false) => {
+            isExplicitlyDisconnected = false;
+            stopWsHeartbeat();
+
+            if (ws) {
+              try { ws.close(); } catch (_) {}
+            }
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}?peerId=${myPeerId.value}&deviceName=${encodeURIComponent(deviceName.value)}`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+              startWsHeartbeat();
+              if (isReconnect) {
+                console.log('Signaling WebSocket reconnected successfully');
+              }
+            };
+
+            // 如果已有 rtc 实例且正在重连信令，只需更新 sendSignal 回调
+            if (!rtc || !isReconnect) {
+              if (rtc) rtc.destroy();
+              rtc = new WebRTCManager({
+                sendSignal: (type, payload) => {
+                  if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(createSignalMessage(type, payload));
+                  }
+                },
+                onConnected: () => {
+                  isConnected.value = true;
+                  acquireWakeLock();
+                  showToast('WebRTC 直连建立成功！');
+                },
+                onDisconnected: () => {
+                  isConnected.value = false;
+                  releaseWakeLock();
+                  showToast('对端直连已断开');
+                },
+                onTextMessage: (text) => {
+                  try {
+                    const data = JSON.parse(text);
+                    if (data.action === 'file-meta') {
+                      handleIncomingFileMeta(data);
+                    } else if (data.action === 'file-end') {
+                      handleIncomingFileEnd(data.fileId);
+                    } else if (data.action === 'chat') {
+                      textMessages.value.push({ sender: peerDeviceName.value, text: data.text });
+                    }
+                  } catch (_) {
+                    textMessages.value.push({ sender: peerDeviceName.value, text });
+                  }
+                },
+                onBinaryMessage: (arrayBuffer) => {
+                  handleIncomingChunk(arrayBuffer);
+                },
+              });
+            } else {
+              // 仅更新信号发射通道
+              rtc.sendSignal = (type, payload) => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(createSignalMessage(type, payload));
+                }
+              };
+            }
+
+            ws.onmessage = async (event) => {
+              try {
+                const msg = parseSignalMessage(event.data);
+                switch (msg.type) {
+                  case SIGNAL_TYPES.PONG:
+                    // 心跳响应，正常忽略
+                    break;
+
+                  case SIGNAL_TYPES.ROOM_STATE:
+                    if (msg.payload.peers && msg.payload.peers.length > 0) {
+                      peerDeviceName.value = msg.payload.peers[0].deviceName || '对端设备';
+                      // 房间内已有其他人且 P2P 尚未建立，发起 WebRTC Offer
+                      if (!isConnected.value) {
+                        await rtc.startAsInitiator();
+                      }
+                    }
+                    break;
+
+                  case SIGNAL_TYPES.PEER_JOINED:
+                    peerDeviceName.value = msg.payload.deviceName || '对端设备';
+                    showToast(`${peerDeviceName.value} 已扫码加入房间`);
+                    break;
+
+                  case SIGNAL_TYPES.OFFER:
+                    await rtc.handleOffer(msg.payload);
+                    break;
+
+                  case SIGNAL_TYPES.ANSWER:
+                    await rtc.handleAnswer(msg.payload);
+                    break;
+
+                  case SIGNAL_TYPES.CANDIDATE:
+                    await rtc.handleCandidate(msg.payload.candidate);
+                    break;
+
+                  case SIGNAL_TYPES.PEER_LEFT:
+                    // 若 DataChannel 依然通畅，不立即重置 UI，避免信令瞬断影响传输
+                    if (rtc && rtc.dataChannel && rtc.dataChannel.readyState === 'open') {
+                      console.warn('Signaling notified PEER_LEFT but DataChannel is still alive');
+                    } else {
+                      showToast('对端已离开');
+                      isConnected.value = false;
+                      releaseWakeLock();
+                    }
+                    break;
+
+                  case SIGNAL_TYPES.ERROR:
+                    showToast('信令错误：' + msg.payload.message);
+                    break;
+                }
+              } catch (err) {
+                console.error('Error handling signal message:', err);
+              }
+            };
+
+            ws.onclose = () => {
+              stopWsHeartbeat();
+              // 非手动断开情况下，在后台自动拉起信令重连
+              if (currentRoomCode.value && !isExplicitlyDisconnected) {
+                setTimeout(() => {
+                  if (currentRoomCode.value && !isExplicitlyDisconnected) {
+                    connectSignaling(currentRoomCode.value, false, true);
+                  }
+                }, 2000);
+              }
+            };
+
+            ws.onerror = (e) => {
+              console.error('Signaling WebSocket error:', e);
+            };
+          };
 
         // 接收端分片处理
         const handleIncomingFileMeta = (meta) => {
@@ -583,6 +685,9 @@
 
         // 断开连接
         const disconnectSession = () => {
+          isExplicitlyDisconnected = true;
+          stopWsHeartbeat();
+          releaseWakeLock();
           if (rtc) rtc.destroy();
           if (ws) ws.close();
           isConnected.value = false;
