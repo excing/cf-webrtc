@@ -34,6 +34,26 @@ export const CHUNK_CONFIG = Object.freeze({
 });
 
 /**
+ * 默认多厂商联合高可用 STUN 列表 (按厂商网络地域与端口分层容灾)
+ */
+export const DEFAULT_ICE_SERVERS = Object.freeze([
+  // 1. Cloudflare 全球 Anycast 边缘 (与 Worker 部署同网生态，低延迟)
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  // 2. 国内厂商低延迟节点 (针对中国大陆三大运营商网络优化)
+  { urls: 'stun:stun.qq.com:3478' },
+  { urls: 'stun:stun.chat.bilibili.com:3478' },
+  // 3. Google 官方全球分布式节点群 (高可用灾备)
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // 4. 支持 443 端口备用节点 (规避企业/校园网对 3478 UDP 端口的封锁)
+  { urls: 'stun:stun.nextcloud.com:443' },
+  // 5. 国际电信级服务商
+  { urls: 'stun:global.stun.twilio.com:3478' },
+]);
+
+
+/**
  * 创建标准信令消息字符串
  * @param {string} type
  * @param {Record<string, any>} payload

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   SIGNAL_TYPES,
   CHUNK_CONFIG,
+  DEFAULT_ICE_SERVERS,
   createSignalMessage,
   parseSignalMessage,
 } from '../public/utils/protocol.js';
@@ -59,4 +60,20 @@ describe('Signaling Protocol (SSOT)', () => {
     assert.ok(CHUNK_CONFIG.HIGH_WATER_MARK > CHUNK_CONFIG.LOW_WATER_MARK);
     assert.ok(CHUNK_CONFIG.LOW_WATER_MARK >= CHUNK_CONFIG.CHUNK_SIZE);
   });
+
+  it('should configure multi-vendor high-availability ICE/STUN servers', () => {
+    assert.ok(Array.isArray(DEFAULT_ICE_SERVERS));
+    assert.ok(DEFAULT_ICE_SERVERS.length >= 6);
+
+    const urls = DEFAULT_ICE_SERVERS.map((s) => s.urls);
+    // Cloudflare Anycast
+    assert.ok(urls.some((u) => u.includes('cloudflare.com')));
+    // Google group
+    assert.ok(urls.some((u) => u.includes('google.com')));
+    // Tencent group (domestic CN)
+    assert.ok(urls.some((u) => u.includes('qq.com')));
+    // Port 443 fallback (firewall bypass)
+    assert.ok(urls.some((u) => u.includes(':443')));
+  });
 });
+

@@ -3,13 +3,9 @@
  * @description WebRTC 连接与 DataChannel 生命周期管理器
  */
 
-import { SIGNAL_TYPES } from './protocol.js';
+import { SIGNAL_TYPES, DEFAULT_ICE_SERVERS } from './protocol.js';
 
-export const DEFAULT_ICE_SERVERS = [
-  { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun.qq.com:3478' },
-];
+export { DEFAULT_ICE_SERVERS };
 
 export class WebRTCManager {
   /**
