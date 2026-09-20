@@ -2,54 +2,52 @@
 <html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#f8fafc" />
-  <title>CF-WebRTC · 极简点对点直传</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#2563eb" />
+  <title>CF-WebRTC - 极速点对点局域网/公网文件互传</title>
   <link rel="icon" href="./favicon.svg" />
   <link rel="stylesheet" href="./index.css" />
 </head>
 
 <body>
-  <div id="app" v-cloak>
-    <!-- 极简顶栏 -->
-    <header class="app-header">
-      <div class="header-left">
-        <div class="status-dot" :class="{ online: isConnected, waiting: !isConnected && currentRoomCode }"></div>
-        <div class="header-title-group">
-          <div class="header-title">
-            <span>{{ isConnected ? peerDeviceName : '等待连接' }}</span>
-            <span v-if="isConnected" style="font-size: 11px; color: #10b981; font-weight: 500;">(直连中)</span>
-          </div>
-          <div class="header-sub">我的设备: {{ deviceName }}</div>
+  <div id="app" class="app-container" v-cloak>
+    <!-- 顶部导航栏 -->
+    <header class="top-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+            <path d="m8 17 4-4 4 4"></path>
+            <path d="M12 13v9"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">CF-WebRTC</h1>
+          <p class="brand-subtitle">P2P 直连传输 · 零云端存储 · 极速安全</p>
         </div>
       </div>
 
-      <div class="header-right">
-        <!-- 房间号 / 二维码收放按钮 -->
-        <button class="pill-btn" @click="isQrOpen = !isQrOpen" :title="isQrOpen ? '收起二维码' : '查看二维码'">
+      <div class="header-actions">
+        <div class="device-badge" @click="promptRename" title="点击修改设备名称">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="5" height="5" x="3" y="3" rx="1"></rect>
-            <rect width="5" height="5" x="16" y="3" rx="1"></rect>
-            <rect width="5" height="5" x="3" y="16" rx="1"></rect>
-            <path d="M21 16h-3a2 2 0 0 0-2 2v3"></path>
-            <path d="M21 21v.01"></path>
-            <path d="M12 7v3a2 2 0 0 1-2 2H7"></path>
+            <rect width="20" height="14" x="2" y="3" rx="2"></rect>
+            <line x1="8" x2="16" y1="21" y2="21"></line>
+            <line x1="12" x2="12" y1="17" y2="21"></line>
           </svg>
-          <span>{{ currentRoomCode || '开房' }}</span>
-        </button>
+          <span>{{ deviceName }}</span>
+        </div>
 
-        <!-- 修改设备名 -->
-        <button class="icon-btn" @click="promptRename" title="修改设备名">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-          </svg>
-        </button>
-
-        <!-- 深浅色切换 -->
-        <button class="icon-btn" @click="toggleTheme" :title="theme === 'dark' ? '浅色模式' : '深色模式'">
+        <button class="theme-btn" @click="toggleTheme" :title="theme === 'dark' ? '切换浅色模式' : '切换深色模式'">
           <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
           </svg>
           <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
@@ -58,172 +56,205 @@
       </div>
     </header>
 
-    <!-- 统一消息流时间线 (Chat-First) -->
-    <main class="chat-container" ref="chatContainer">
-      <!-- 欢迎与配对轻量卡片 -->
-      <section class="pairing-hero" v-if="!isConnected">
-        <div class="hero-tagline">WebRTC 点对点直连 · 不限大小</div>
-        <div class="hero-pin" @click="copyRoomLink" title="点击复制加入链接">
-          {{ currentRoomCode || '------' }}
-        </div>
-        <p style="font-size: 12px; color: var(--text-secondary);">
-          手机打开相机扫码，或输入房间码即可瞬间配对
-        </p>
+    <!-- 渐进式呈现阶段一：未连接（配对与扫码） -->
+    <main v-if="!isConnected" class="pairing-grid">
+      <!-- 卡片 1：发起分享 / 我的房间 -->
+      <section class="card">
+        <h2 class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="5" height="5" x="3" y="3" rx="1"></rect>
+            <rect width="5" height="5" x="16" y="3" rx="1"></rect>
+            <rect width="5" height="5" x="3" y="16" rx="1"></rect>
+            <path d="M21 16h-3a2 2 0 0 0-2 2v3"></path>
+            <path d="M21 21v.01"></path>
+            <path d="M12 7v3a2 2 0 0 1-2 2H7"></path>
+            <path d="M3 12h.01"></path>
+            <path d="M12 3h.01"></path>
+            <path d="M12 16v.01"></path>
+            <path d="M16 12h1"></path>
+            <path d="M21 12v.01"></path>
+            <path d="M12 21v-1"></path>
+          </svg>
+          <span>扫码或分享加入</span>
+        </h2>
+        <p class="card-desc">用手机相机扫描二维码，或分享房间链接直接配对</p>
 
-        <!-- 二维码折叠抽屉 -->
-        <div class="qr-drawer" :class="{ open: isQrOpen }">
-          <div class="qr-canvas-box">
-            <canvas ref="qrCanvas" style="width: 140px; height: 140px; display: block;"></canvas>
-          </div>
+        <div class="qr-container">
+          <canvas ref="qrCanvas" class="qr-canvas"></canvas>
         </div>
 
-        <div class="hero-actions">
-          <button class="pill-btn primary" @click="copyRoomLink">复制邀请链接</button>
-          <button class="pill-btn" @click="promptJoinRoom">输入对方房间码</button>
-          <button class="pill-btn" @click="createNewRoom">换一个房间</button>
+        <div class="room-pin-display">
+          <span class="room-pin-text">{{ currentRoomCode || '------' }}</span>
+          <button class="btn-copy" @click="copyJoinLink" title="复制加入链接">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+            </svg>
+          </button>
         </div>
+
+        <button class="btn btn-outline" @click="createNewRoom" :disabled="isConnecting">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+            <path d="M21 3v5h-5"></path>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+            <path d="M8 16H3v5"></path>
+          </svg>
+          <span>刷新房间号</span>
+        </button>
       </section>
 
-      <!-- 消息与媒体流 -->
-      <template v-for="item in timeline" :key="item.id">
-        <!-- 1. 系统通知消息 -->
-        <div v-if="item.type === 'system'" class="system-bubble">
-          <span>{{ item.text }}</span>
+      <!-- 卡片 2：输入房间码加入 -->
+      <section class="card">
+        <h2 class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+            <polyline points="10 17 15 12 10 7"></polyline>
+            <line x1="15" x2="3" y1="12" y2="12"></line>
+          </svg>
+          <span>加入已有房间</span>
+        </h2>
+        <p class="card-desc">输入对方屏幕上显示的 6 位房间码</p>
+
+        <div class="pin-input-group">
+          <input
+            v-for="(val, idx) in pinDigits"
+            :key="idx"
+            :ref="el => pinInputs[idx] = el"
+            v-model="pinDigits[idx]"
+            type="text"
+            maxlength="1"
+            class="pin-input"
+            @input="handlePinInput(idx, $event)"
+            @keydown.backspace="handlePinBackspace(idx, $event)"
+            @paste="handlePinPaste($event)"
+          />
         </div>
 
-        <!-- 2. 普通文本消息 -->
-        <div v-else-if="item.type === 'text'" class="message-row" :class="item.sender">
-          <div v-if="item.sender === 'peer'" class="message-sender-name">{{ peerDeviceName }}</div>
-          <div class="text-bubble" @click="copyText(item.text)">
-            {{ item.text }}
-          </div>
+        <button class="btn btn-primary" @click="joinRoomByPin" :disabled="!isPinComplete || isConnecting">
+          <span v-if="isConnecting">正在连接信令...</span>
+          <span v-else>立即连接</span>
+        </button>
+
+        <div style="margin-top: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+          <p>💡 提示：</p>
+          <p>• 同一 Wi-Fi 下直连传输跑满路由器物理速率。</p>
+          <p>• 文件端到端加密，数据不经过云端服务器存储。</p>
         </div>
-
-        <!-- 3. 多媒体/文件卡片 -->
-        <div v-else-if="item.type === 'file'" class="message-row" :class="item.sender">
-          <div v-if="item.sender === 'peer'" class="message-sender-name">{{ peerDeviceName }}</div>
-          <div class="media-card">
-            <!-- 图片预览 -->
-            <div v-if="isImage(item.name) && item.blobUrl" class="image-preview-wrapper" @click="openLightbox(item.blobUrl)">
-              <img :src="item.blobUrl" class="image-preview" alt="preview" />
-            </div>
-
-            <!-- 视频内联播放 -->
-            <video v-else-if="isVideo(item.name) && item.blobUrl" :src="item.blobUrl" controls playsinline class="video-preview"></video>
-
-            <!-- 音频内联播放 -->
-            <div v-else-if="isAudio(item.name) && item.blobUrl" style="padding: 10px 14px;">
-              <audio :src="item.blobUrl" controls style="width: 100%; height: 36px;"></audio>
-            </div>
-
-            <!-- 文件元信息行 -->
-            <div class="file-meta-bar">
-              <div class="file-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-              </div>
-              <div class="file-info">
-                <div class="file-name" :title="item.name">{{ item.name }}</div>
-                <div class="file-size-sub">{{ formatBytes(item.size) }} · {{ item.statusText }}</div>
-              </div>
-
-              <!-- 下载按钮 (按需下载，关闭窗口前随时可用) -->
-              <a
-                v-if="item.blobUrl"
-                :href="item.blobUrl"
-                :download="item.name"
-                class="file-action-btn"
-                title="保存到本地"
-                @click="item.hasDownloaded = true"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" x2="12" y1="15" y2="3"></line>
-                </svg>
-              </a>
-            </div>
-
-            <!-- 传输进度条与微光速率 -->
-            <div v-if="item.progress < 100" class="media-progress-box">
-              <div class="shimmer-progress-bg">
-                <div class="shimmer-progress-fill" :style="{ width: item.progress + '%' }"></div>
-              </div>
-              <div class="media-progress-stat">
-                <span>{{ item.progress }}%</span>
-                <span>{{ formatSpeed(item.speed) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
+      </section>
     </main>
 
-    <!-- 底部悬浮输入栏 (移动端安全区自适应) -->
-    <footer class="chat-bottom-bar">
-      <!-- 待发送暂存区 (Staging Tray) -->
-      <div v-if="stagedFiles.length > 0" class="staging-tray">
-        <div v-for="(file, index) in stagedFiles" :key="index" class="staging-item">
-          <img v-if="file.previewUrl" :src="file.previewUrl" class="staging-img" />
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-          </svg>
-          <button class="staging-remove" @click="removeStagedFile(index)">×</button>
+    <!-- 渐进式呈现阶段二：已连接（传输工作台） -->
+    <main v-else class="transfer-dashboard">
+      <!-- 状态条 -->
+      <div class="peer-status-banner">
+        <div class="peer-info">
+          <div class="peer-avatar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="peer-name">已与对端直连：{{ peerDeviceName }}</div>
+            <div class="peer-hint">WebRTC DataChannel (E2EE 端到端加密传输)</div>
+          </div>
         </div>
-      </div>
-
-      <div class="input-pill">
-        <!-- 附件按钮 -->
-        <button class="icon-btn" @click="triggerFileSelect" title="选择文件或照片">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-          </svg>
-        </button>
-
-        <!-- 文本输入框 (支持直接回车发送) -->
-        <input
-          v-model="inputMsg"
-          type="text"
-          class="chat-input"
-          :placeholder="stagedFiles.length > 0 ? '添加附言并回车发送...' : (isConnected ? '输入文字、直接拖拽或粘贴文件...' : '输入文字或对方房间码...')"
-          @keyup.enter="handleSendAction"
-        />
-
-        <!-- 发送按钮 -->
-        <button class="send-btn" @click="handleSendAction" title="发送">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
+        <button class="btn btn-outline" style="width: auto; padding: 6px 14px;" @click="disconnectSession">
+          断开连接
         </button>
       </div>
 
-      <input ref="fileInputEl" type="file" multiple hidden @change="onFilesSelected" />
-    </footer>
-
-    <!-- 全局拖拽悬浮目标 (Drop Target) -->
-    <div class="global-drop-target" :class="{ active: isDragging }">
-      <div class="drop-icon-ring">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- 文件投放区 -->
+      <div
+        class="dropzone"
+        :class="{ active: isDragging }"
+        @dragover.prevent="isDragging = true"
+        @dragleave.prevent="isDragging = false"
+        @drop.prevent="handleFileDrop"
+        @click="triggerFileInput"
+      >
+        <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
           <polyline points="17 8 12 3 7 8"></polyline>
           <line x1="12" x2="12" y1="3" y2="15"></line>
         </svg>
-      </div>
-      <div style="font-size: 16px; font-weight: 600; color: var(--brand);">松开即可立即投递文件</div>
-    </div>
+        <h3 class="dropzone-title">拖拽文件到这里，或点击选择</h3>
+        <p class="dropzone-desc">支持任意格式与大文件 (不限大小)</p>
 
-    <!-- 全屏高清大图查看灯箱 (Lightbox) -->
-    <div v-if="activeLightboxUrl" class="lightbox-modal" @click="activeLightboxUrl = null">
-      <button class="lightbox-close" @click="activeLightboxUrl = null">✕</button>
-      <img :src="activeLightboxUrl" class="lightbox-content" @click.stop />
+        <input ref="fileInput" type="file" multiple hidden @change="handleFileSelect" />
+        <input ref="folderInput" type="file" webkitdirectory directory multiple hidden @change="handleFileSelect" />
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn btn-outline" style="width: auto;" @click="triggerFileInput">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          选择文件
+        </button>
+        <button class="btn btn-outline" style="width: auto;" @click="triggerFolderInput">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+          </svg>
+          选择文件夹
+        </button>
+      </div>
+
+      <!-- 传输任务列表 -->
+      <section v-if="tasks.length > 0" class="queue-section">
+        <h4 class="section-title">传输队列 ({{ tasks.length }})</h4>
+        <div v-for="t in tasks" :key="t.id" class="task-card">
+          <div class="task-header">
+            <span class="task-name" :title="t.name">{{ t.name }}</span>
+            <span class="task-meta">{{ formatBytes(t.size) }}</span>
+          </div>
+
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" :style="{ width: t.progress + '%' }"></div>
+          </div>
+
+          <div class="task-footer">
+            <span>{{ t.statusText }}</span>
+            <span v-if="t.speed > 0 && t.progress < 100">{{ formatSpeed(t.speed) }}</span>
+            <span v-if="t.blobUrl">
+              <a :href="t.blobUrl" :download="t.name" class="btn btn-primary" style="padding: 2px 10px; font-size: 12px; width: auto;">保存</a>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 快速文本 / 剪贴板互通 -->
+      <section class="text-sync-box">
+        <h4 class="card-title" style="font-size: 14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>互通文字 / 链接</span>
+        </h4>
+        <div class="text-sync-input-row">
+          <input v-model="quickText" type="text" placeholder="输入要同步给对端的文字或网址..." class="text-sync-input" @keyup.enter="sendQuickText" />
+          <button class="btn btn-primary" style="width: auto;" @click="sendQuickText">发送</button>
+        </div>
+        <div v-if="textMessages.length > 0" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <div v-for="(msg, i) in textMessages" :key="i" style="font-size: 13px; padding: 6px 10px; background: var(--bg-subtle); border-radius: 6px; word-break: break-all;">
+            <b>{{ msg.sender }}:</b> {{ msg.text }}
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 轻提示 (Toast) -->
+    <div class="toast-container">
+      <div v-for="toast in toasts" :key="toast.id" class="toast">
+        {{ toast.message }}
+      </div>
     </div>
   </div>
 
+  <!-- 前端脚本采用 Vue 3 CDN ESM 规范模块化加载 -->
   <script type="module">
-    import { createApp, ref, reactive, onMounted, nextTick } from 'https://unpkg.com/vue@3.5.34/dist/vue.esm-browser.prod.js';
+    import { createApp, ref, reactive, computed, onMounted, nextTick } from 'https://unpkg.com/vue@3.5.34/dist/vue.esm-browser.prod.js';
     import QRCode from 'https://esm.sh/qrcode@1.5.4';
     import { SIGNAL_TYPES, createSignalMessage, parseSignalMessage } from './utils/protocol.js';
     import { WebRTCManager } from './utils/webrtc_manager.js';
@@ -231,6 +262,7 @@
 
     createApp({
       setup() {
+        // 主题与设备管理
         const theme = ref(localStorage.getItem('cf_webrtc_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
         const toggleTheme = () => {
           theme.value = theme.value === 'dark' ? 'light' : 'dark';
@@ -243,99 +275,96 @@
           const ua = navigator.userAgent;
           if (/iPhone/i.test(ua)) return 'iPhone';
           if (/iPad/i.test(ua)) return 'iPad';
-          if (/Android/i.test(ua)) return 'Android';
+          if (/Android/i.test(ua)) return 'Android Phone';
           if (/Macintosh/i.test(ua)) return 'Mac';
-          if (/Windows/i.test(ua)) return 'Windows';
-          return '设备';
+          if (/Windows/i.test(ua)) return 'Windows PC';
+          return 'Web Device';
         };
 
         const deviceName = ref(localStorage.getItem('cf_webrtc_device_name') || detectDevice());
         const promptRename = () => {
-          const val = window.prompt('修改当前设备名称：', deviceName.value);
-          if (val && val.trim()) {
-            deviceName.value = val.trim();
+          const newName = window.prompt('请输入新的设备名称：', deviceName.value);
+          if (newName && newName.trim()) {
+            deviceName.value = newName.trim();
             localStorage.setItem('cf_webrtc_device_name', deviceName.value);
           }
         };
 
         const myPeerId = ref(crypto.randomUUID().slice(0, 8));
+
+        // 房间与连接状态
         const currentRoomCode = ref('');
-        const isQrOpen = ref(false);
         const qrCanvas = ref(null);
+        const pinDigits = reactive(['', '', '', '', '', '']);
+        const pinInputs = [];
+        const isConnecting = ref(false);
         const isConnected = ref(false);
-        const peerDeviceName = ref('对端');
-
-        // 统一对话时间线 (Chat Stream Timeline)
-        const timeline = reactive([]);
-        const chatContainer = ref(null);
-        const scrollToBottom = async () => {
-          await nextTick();
-          if (chatContainer.value) {
-            chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-          }
-        };
-
-        const addSystemMsg = (text) => {
-          timeline.push({ id: Date.now() + Math.random(), type: 'system', text });
-          scrollToBottom();
-        };
-
-        // 暂存托盘 (Staging Tray)
-        const stagedFiles = reactive([]);
-        const inputMsg = ref('');
-        const fileInputEl = ref(null);
+        const peerDeviceName = ref('未知对端');
         const isDragging = ref(false);
-        const activeLightboxUrl = ref(null);
+
+        // 传输与消息
+        const tasks = ref([]);
+        const quickText = ref('');
+        const textMessages = ref([]);
+        const toasts = ref([]);
+
+        const showToast = (message) => {
+          const id = Date.now() + Math.random();
+          toasts.value.push({ id, message });
+          setTimeout(() => {
+            toasts.value = toasts.value.filter(t => t.id !== id);
+          }, 3000);
+        };
 
         let ws = null;
         let rtc = null;
-        let activeReceivers = new Map();
+        let activeReceivers = new Map(); // fileId -> FileReceiver
 
+        // 二维码绘制
         const renderQR = async (text) => {
           await nextTick();
           if (qrCanvas.value) {
             try {
               await QRCode.toCanvas(qrCanvas.value, text, {
-                width: 140,
+                width: 180,
                 margin: 1,
-                color: { dark: '#000000', light: '#ffffff' }
+                color: { dark: '#000000', light: '#ffffff' },
               });
             } catch (err) {
-              console.error('QR error:', err);
+              console.error('QR rendering error:', err);
             }
           }
         };
 
+        // 创建新房间
         const createNewRoom = async () => {
           try {
+            isConnecting.value = true;
             const res = await fetch('/api/room/new', { method: 'POST' });
             const data = await res.json();
             currentRoomCode.value = data.code;
+
             const joinUrl = `${window.location.origin}/?room=${data.code}`;
             await renderQR(joinUrl);
-            connectSignaling(data.code);
+
+            // 连接信令 WebSocket
+            connectSignaling(data.code, true);
           } catch (err) {
-            addSystemMsg('创建房间失败: ' + err.message);
+            showToast('创建房间失败：' + err.message);
+          } finally {
+            isConnecting.value = false;
           }
         };
 
-        const copyRoomLink = () => {
+        const copyJoinLink = () => {
           const url = `${window.location.origin}/?room=${currentRoomCode.value}`;
           navigator.clipboard.writeText(url).then(() => {
-            addSystemMsg('房间链接已复制到剪贴板！');
+            showToast('房间链接已复制到剪贴板！');
           });
         };
 
-        const promptJoinRoom = () => {
-          const code = window.prompt('请输入对方屏幕上的 6 位房间码：');
-          if (code && code.trim()) {
-            const clean = code.trim().toUpperCase();
-            currentRoomCode.value = clean;
-            connectSignaling(clean);
-          }
-        };
-
-        const connectSignaling = (roomId) => {
+        // 信令通道连接
+        const connectSignaling = (roomId, isRoomCreator = false) => {
           if (ws) {
             try { ws.close(); } catch (_) {}
           }
@@ -353,299 +382,272 @@
             },
             onConnected: () => {
               isConnected.value = true;
-              isQrOpen.value = false;
-              addSystemMsg(`已与 [${peerDeviceName.value}] 建立端到端加密 P2P 直连`);
+              showToast('WebRTC 直连建立成功！');
             },
             onDisconnected: () => {
               isConnected.value = false;
-              addSystemMsg('与对端直连已断开');
+              showToast('对端已断开连接');
             },
             onTextMessage: (text) => {
               try {
                 const data = JSON.parse(text);
                 if (data.action === 'file-meta') {
-                  handleIncomingMeta(data);
+                  handleIncomingFileMeta(data);
                 } else if (data.action === 'file-end') {
-                  handleIncomingEnd(data.fileId);
+                  handleIncomingFileEnd(data.fileId);
                 } else if (data.action === 'chat') {
-                  timeline.push({ id: Date.now() + Math.random(), type: 'text', sender: 'peer', text: data.text });
-                  scrollToBottom();
+                  textMessages.value.push({ sender: peerDeviceName.value, text: data.text });
                 }
               } catch (_) {
-                timeline.push({ id: Date.now() + Math.random(), type: 'text', sender: 'peer', text });
-                scrollToBottom();
+                textMessages.value.push({ sender: peerDeviceName.value, text });
               }
             },
             onBinaryMessage: (arrayBuffer) => {
               handleIncomingChunk(arrayBuffer);
-            }
+            },
           });
 
-          ws.onmessage = async (e) => {
+          ws.onmessage = async (event) => {
             try {
-              const msg = parseSignalMessage(e.data);
+              const msg = parseSignalMessage(event.data);
               switch (msg.type) {
                 case SIGNAL_TYPES.ROOM_STATE:
                   if (msg.payload.peers && msg.payload.peers.length > 0) {
-                    peerDeviceName.value = msg.payload.peers[0].deviceName || '对端';
+                    peerDeviceName.value = msg.payload.peers[0].deviceName || '对端设备';
+                    // 房间内已有其他人，发起 WebRTC Offer
                     await rtc.startAsInitiator();
                   }
                   break;
+
                 case SIGNAL_TYPES.PEER_JOINED:
-                  peerDeviceName.value = msg.payload.deviceName || '对端';
-                  addSystemMsg(`[${peerDeviceName.value}] 加入了房间`);
+                  peerDeviceName.value = msg.payload.deviceName || '对端设备';
+                  showToast(`${peerDeviceName.value} 已扫码加入房间`);
                   break;
+
                 case SIGNAL_TYPES.OFFER:
                   await rtc.handleOffer(msg.payload);
                   break;
+
                 case SIGNAL_TYPES.ANSWER:
                   await rtc.handleAnswer(msg.payload);
                   break;
+
                 case SIGNAL_TYPES.CANDIDATE:
                   await rtc.handleCandidate(msg.payload.candidate);
                   break;
+
                 case SIGNAL_TYPES.PEER_LEFT:
-                  addSystemMsg('对端离开了房间');
+                  showToast('对端已离开');
                   isConnected.value = false;
                   break;
+
                 case SIGNAL_TYPES.ERROR:
-                  addSystemMsg('信令提示: ' + msg.payload.message);
+                  showToast('信令错误：' + msg.payload.message);
                   break;
               }
             } catch (err) {
-              console.error('Signal parse err:', err);
+              console.error('Error handling signal message:', err);
             }
+          };
+
+          ws.onerror = (e) => {
+            console.error('Signaling WebSocket error:', e);
           };
         };
 
-        // 接收端逻辑 (不强制自动下载，保留在气泡中随时点击保存)
-        const handleIncomingMeta = (meta) => {
-          const item = reactive({
+        // 接收端分片处理
+        const handleIncomingFileMeta = (meta) => {
+          const task = {
             id: meta.fileId,
-            type: 'file',
-            sender: 'peer',
             name: meta.name,
             size: meta.size,
             progress: 0,
             speed: 0,
-            statusText: '正在传输',
+            statusText: '正在接收...',
             blobUrl: null,
-            hasDownloaded: false,
-          });
-          timeline.push(item);
-          scrollToBottom();
+          };
+          tasks.value.unshift(task);
 
           const receiver = new FileReceiver(meta, {
-            onProgress: (p, s) => {
-              item.progress = Math.round(p);
-              item.speed = s;
+            onProgress: (progress, speed) => {
+              task.progress = Math.round(progress);
+              task.speed = speed;
             },
             onComplete: (blob) => {
-              item.progress = 100;
-              item.speed = 0;
-              item.statusText = '传输完成 · 可随时下载';
+              task.progress = 100;
+              task.speed = 0;
+              task.statusText = '接收完成';
               if (blob) {
-                item.blobUrl = URL.createObjectURL(blob);
+                task.blobUrl = URL.createObjectURL(blob);
+                // 自动触发浏览器下载
+                const a = document.createElement('a');
+                a.href = task.blobUrl;
+                a.download = meta.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showToast(`文件 "${meta.name}" 接收完毕并已下载！`);
               }
               activeReceivers.delete(meta.fileId);
-              // 轻触觉震动反馈 (如设备支持)
-              if (navigator.vibrate) navigator.vibrate(12);
             }
           });
+
           activeReceivers.set(meta.fileId, receiver);
         };
 
-        const handleIncomingChunk = async (buf) => {
-          const view = new DataView(buf);
+        const handleIncomingChunk = async (arrayBuffer) => {
+          const view = new DataView(arrayBuffer);
           const fileId = view.getUint32(0, false);
           const chunkIndex = view.getUint32(4, false);
-          const data = new Uint8Array(buf, 8);
-          const r = activeReceivers.get(fileId);
-          if (r) await r.appendChunk(chunkIndex, data);
+          const data = new Uint8Array(arrayBuffer, 8);
+
+          const receiver = activeReceivers.get(fileId);
+          if (receiver) {
+            await receiver.appendChunk(chunkIndex, data);
+          }
         };
 
-        const handleIncomingEnd = async (fileId) => {
-          const r = activeReceivers.get(fileId);
-          if (r) await r.finalize();
+        const handleIncomingFileEnd = async (fileId) => {
+          const receiver = activeReceivers.get(fileId);
+          if (receiver) {
+            await receiver.finalize();
+          }
         };
 
         // 发送文件
-        const sendStagedFiles = async () => {
-          if (!stagedFiles.length) return;
+        const sendFiles = async (fileList) => {
           if (!rtc || !rtc.dataChannel || rtc.dataChannel.readyState !== 'open') {
-            addSystemMsg('通道未建立，无法发送');
+            showToast('对端通道未就绪，无法发送');
             return;
           }
 
-          const toSend = [...stagedFiles];
-          stagedFiles.splice(0, stagedFiles.length);
-
-          for (const item of toSend) {
-            const file = item.file;
+          for (const file of fileList) {
             const fileId = Math.floor(Math.random() * 0x7FFFFFFF);
-            const msgItem = reactive({
+            const task = reactive({
               id: fileId,
-              type: 'file',
-              sender: 'me',
               name: file.name,
               size: file.size,
               progress: 0,
               speed: 0,
-              statusText: '正在发送',
-              blobUrl: item.previewUrl || URL.createObjectURL(file),
+              statusText: '正在发送...',
             });
-            timeline.push(msgItem);
-            scrollToBottom();
+            tasks.value.unshift(task);
 
             const sender = new FileSender(rtc.dataChannel, file, fileId, {
-              onProgress: (p, s) => {
-                msgItem.progress = Math.round(p);
-                msgItem.speed = s;
+              onProgress: (progress, speed) => {
+                task.progress = Math.round(progress);
+                task.speed = speed;
               },
               onComplete: () => {
-                msgItem.progress = 100;
-                msgItem.speed = 0;
-                msgItem.statusText = '发送完成';
+                task.progress = 100;
+                task.speed = 0;
+                task.statusText = '发送完成';
+                showToast(`文件 "${file.name}" 发送完成`);
               },
               onError: (err) => {
-                msgItem.statusText = '失败: ' + err.message;
+                task.statusText = '发送失败：' + err.message;
               }
             });
+
             await sender.start();
           }
         };
 
-        // 综合发送动作 (支持发送文本、暂存文件、或输入房间号连接)
-        const handleSendAction = () => {
-          const text = inputMsg.value.trim();
+        // 文件拖拽与选择
+        const fileInput = ref(null);
+        const folderInput = ref(null);
+        const triggerFileInput = () => fileInput.value?.click();
+        const triggerFolderInput = () => folderInput.value?.click();
 
-          // 如果当前未连接，且用户输入的是 6 位大写房间码，直接发起连接！
-          if (!isConnected.value && /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/i.test(text)) {
-            const clean = text.toUpperCase();
-            currentRoomCode.value = clean;
-            connectSignaling(clean);
-            inputMsg.value = '';
-            return;
-          }
-
-          // 如果有暂存文件，优先触发发送文件
-          if (stagedFiles.length > 0) {
-            sendStagedFiles();
-          }
-
-          // 如果有文本内容，发送文本
-          if (text) {
-            if (rtc && rtc.dataChannel && rtc.dataChannel.readyState === 'open') {
-              rtc.dataChannel.send(JSON.stringify({ action: 'chat', text }));
-              timeline.push({ id: Date.now() + Math.random(), type: 'text', sender: 'me', text });
-              scrollToBottom();
-            } else {
-              addSystemMsg('未连接到任何设备，文字已暂存');
-            }
-            inputMsg.value = '';
+        const handleFileSelect = (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            sendFiles(Array.from(e.target.files));
           }
         };
 
-        // 剪贴板直粘 (Paste to Send)
-        document.addEventListener('paste', (e) => {
-          if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
-            e.preventDefault();
-            stageFiles(Array.from(e.clipboardData.files));
-          }
-        });
-
-        // 全局文件拖拽 (Global Drag & Drop)
-        window.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          isDragging.value = true;
-        });
-
-        window.addEventListener('dragleave', (e) => {
-          if (e.clientX === 0 && e.clientY === 0) {
-            isDragging.value = false;
-          }
-        });
-
-        window.addEventListener('drop', (e) => {
-          e.preventDefault();
+        const handleFileDrop = (e) => {
           isDragging.value = false;
           if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            stageFiles(Array.from(e.dataTransfer.files));
-          }
-        });
-
-        // 暂存文件管理
-        const stageFiles = (files) => {
-          for (const f of files) {
-            let previewUrl = null;
-            if (f.type.startsWith('image/')) {
-              previewUrl = URL.createObjectURL(f);
-            }
-            stagedFiles.push({ file: f, previewUrl });
-          }
-          // 如果已经在对话中，自动直接开始发送，无需额外操作！
-          if (isConnected.value) {
-            sendStagedFiles();
+            sendFiles(Array.from(e.dataTransfer.files));
           }
         };
 
-        const removeStagedFile = (idx) => {
-          stagedFiles.splice(idx, 1);
+        // 文字即时消息
+        const sendQuickText = () => {
+          if (!quickText.value.trim() || !rtc || !rtc.dataChannel) return;
+          const text = quickText.value.trim();
+          rtc.dataChannel.send(JSON.stringify({ action: 'chat', text }));
+          textMessages.value.push({ sender: '我', text });
+          quickText.value = '';
         };
 
-        const triggerFileSelect = () => {
-          fileInputEl.value?.click();
+        // 断开连接
+        const disconnectSession = () => {
+          if (rtc) rtc.destroy();
+          if (ws) ws.close();
+          isConnected.value = false;
+          createNewRoom();
+          showToast('会话已结束');
         };
 
-        const onFilesSelected = (e) => {
-          if (e.target.files && e.target.files.length > 0) {
-            stageFiles(Array.from(e.target.files));
-            e.target.value = '';
+        // OTP 输入框逻辑
+        const isPinComplete = computed(() => pinDigits.every(d => d.length === 1));
+
+        const handlePinInput = (idx, event) => {
+          const val = event.target.value.toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, '');
+          pinDigits[idx] = val.slice(-1);
+          if (pinDigits[idx] && idx < 5) {
+            pinInputs[idx + 1]?.focus();
           }
         };
 
-        // 辅助检测函数
-        const isImage = (name) => /\.(jpg|jpeg|png|gif|webp|svg|avif)$/i.test(name);
-        const isVideo = (name) => /\.(mp4|webm|mov|mkv)$/i.test(name);
-        const isAudio = (name) => /\.(mp3|wav|ogg|m4a|aac)$/i.test(name);
-
-        const openLightbox = (url) => {
-          activeLightboxUrl.value = url;
+        const handlePinBackspace = (idx, event) => {
+          if (!pinDigits[idx] && idx > 0) {
+            pinInputs[idx - 1]?.focus();
+          }
         };
 
-        const copyText = (t) => {
-          navigator.clipboard.writeText(t).then(() => {
-            addSystemMsg('文本已复制');
-          });
+        const handlePinPaste = (event) => {
+          event.preventDefault();
+          const pasted = (event.clipboardData.getData('text') || '').toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, '');
+          for (let i = 0; i < 6; i++) {
+            pinDigits[i] = pasted[i] || '';
+          }
+          const nextFocus = Math.min(pasted.length, 5);
+          pinInputs[nextFocus]?.focus();
         };
 
+        const joinRoomByPin = () => {
+          const code = pinDigits.join('');
+          currentRoomCode.value = code;
+          isConnecting.value = true;
+          connectSignaling(code, false);
+        };
+
+        // 格式化函数
         const formatBytes = (bytes) => {
-          if (!bytes || bytes === 0) return '0 B';
+          if (bytes === 0) return '0 B';
           const k = 1024;
           const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
           const i = Math.floor(Math.log(bytes) / Math.log(k));
-          return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         };
 
         const formatSpeed = (bytesPerSec) => {
           return formatBytes(bytesPerSec) + '/s';
         };
 
-        // 关闭窗口前防呆保护 (未下载文件提醒)
-        window.addEventListener('beforeunload', (e) => {
-          const unsaved = timeline.some(item => item.type === 'file' && item.sender === 'peer' && item.blobUrl && !item.hasDownloaded);
-          if (unsaved) {
-            e.preventDefault();
-            e.returnValue = '有已接收但尚未保存的文件，离开后将清除，确定关闭吗？';
-          }
-        });
-
         onMounted(() => {
-          const params = new URLSearchParams(window.location.search);
-          const room = params.get('room');
-          if (room && room.length === 6) {
-            currentRoomCode.value = room.toUpperCase();
-            connectSignaling(room.toUpperCase());
+          // 检查 URL 是否带 room 参数
+          const urlParams = new URLSearchParams(window.location.search);
+          const roomParam = urlParams.get('room');
+          if (roomParam && roomParam.length === 6) {
+            const cleanCode = roomParam.toUpperCase();
+            for (let i = 0; i < 6; i++) {
+              pinDigits[i] = cleanCode[i] || '';
+            }
+            currentRoomCode.value = cleanCode;
+            connectSignaling(cleanCode, false);
           } else {
             createNewRoom();
           }
@@ -657,31 +659,34 @@
           deviceName,
           promptRename,
           currentRoomCode,
-          isQrOpen,
           qrCanvas,
           createNewRoom,
-          copyRoomLink,
-          promptJoinRoom,
+          copyJoinLink,
+          pinDigits,
+          pinInputs,
+          isPinComplete,
+          handlePinInput,
+          handlePinBackspace,
+          handlePinPaste,
+          joinRoomByPin,
+          isConnecting,
           isConnected,
           peerDeviceName,
-          timeline,
-          chatContainer,
-          stagedFiles,
-          removeStagedFile,
-          inputMsg,
-          handleSendAction,
-          triggerFileSelect,
-          fileInputEl,
-          onFilesSelected,
+          disconnectSession,
           isDragging,
-          activeLightboxUrl,
-          openLightbox,
-          copyText,
-          isImage,
-          isVideo,
-          isAudio,
+          triggerFileInput,
+          triggerFolderInput,
+          fileInput,
+          folderInput,
+          handleFileSelect,
+          handleFileDrop,
+          tasks,
           formatBytes,
           formatSpeed,
+          quickText,
+          textMessages,
+          sendQuickText,
+          toasts,
         };
       }
     }).mount('#app');
