@@ -1,0 +1,22 @@
+{
+  "name": "cf-webrtc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test"
+  },
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/excing/cf-webrtc/issues"
+  },
+  "homepage": "https://github.com/excing/cf-webrtc#readme",
+  "dependencies": {
+    "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "wrangler": "^4.135.0"
+  }
+}
