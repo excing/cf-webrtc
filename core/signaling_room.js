@@ -72,8 +72,13 @@ export class SignalingRoom extends BaseDurableObject {
       }
     }
 
-    // 刷新现有 socket 列表
-    const remainingSockets = this.ctx.getWebSockets();
+    // 排除已关闭或同一 peerId 的老连接，防止误判房间已满
+    const remainingSockets = this.ctx.getWebSockets().filter((s) => {
+      if (s.readyState === 2 || s.readyState === 3) return false;
+      const att = s.deserializeAttachment();
+      if (att && att.peerId === peerId) return false;
+      return true;
+    });
 
     // 1对1 传输房间，最大允许 2 个客户端同时在线
     if (remainingSockets.length >= 2) {

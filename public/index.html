@@ -412,24 +412,59 @@
             }
           });
 
-          // 信令通道连接 (支持断线自愈重连)
+          // 信令重连与防雪崩控制
+          let reconnectAttempts = 0;
+          const MAX_RECONNECT_ATTEMPTS = 5;
+          let reconnectTimer = null;
+          let hasConnectedEver = false;
+
+          const clearReconnectTimer = () => {
+            if (reconnectTimer) {
+              clearTimeout(reconnectTimer);
+              reconnectTimer = null;
+            }
+          };
+
+          // 信令通道连接 (防死循环、指数退避重连)
           const connectSignaling = (roomId, isRoomCreator = false, isReconnect = false) => {
+            clearReconnectTimer();
             isExplicitlyDisconnected = false;
             stopWsHeartbeat();
 
+            if (!isReconnect) {
+              reconnectAttempts = 0;
+              hasConnectedEver = false;
+            }
+
+            // 清理旧连接与其监听器，防止触发旧 socket 的 onclose 产生级联重连
             if (ws) {
+              ws.onopen = null;
+              ws.onmessage = null;
+              ws.onerror = null;
+              ws.onclose = null;
               try { ws.close(); } catch (_) {}
+              ws = null;
             }
 
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}?peerId=${myPeerId.value}&deviceName=${encodeURIComponent(deviceName.value)}`;
 
-            ws = new WebSocket(wsUrl);
+            try {
+              ws = new WebSocket(wsUrl);
+            } catch (err) {
+              isConnecting.value = false;
+              showToast('WebSocket 初始化失败：' + err.message);
+              return;
+            }
 
             ws.onopen = () => {
+              isConnecting.value = false;
+              hasConnectedEver = true;
+              reconnectAttempts = 0;
               startWsHeartbeat();
               if (isReconnect) {
                 console.log('Signaling WebSocket reconnected successfully');
+                showToast('信令重连成功');
               }
             };
 
@@ -534,19 +569,37 @@
               }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (event) => {
               stopWsHeartbeat();
-              // 非手动断开情况下，在后台自动拉起信令重连
-              if (currentRoomCode.value && !isExplicitlyDisconnected) {
-                setTimeout(() => {
+              isConnecting.value = false;
+
+              // 用户显式断开，直接退出
+              if (isExplicitlyDisconnected) return;
+
+              // 如果从未连接成功（例如房间号错误、被 403 拒绝房间已满），绝不盲目重试！
+              if (!hasConnectedEver) {
+                showToast('无法加入房间：房间不存在或已满');
+                return;
+              }
+
+              // 曾经连接成功过，说明是偶发掉线，启动有限次退避重连
+              if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 8000);
+                console.warn(`Signaling connection lost. Reconnecting (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${Math.round(delay)}ms...`);
+                reconnectTimer = setTimeout(() => {
                   if (currentRoomCode.value && !isExplicitlyDisconnected) {
                     connectSignaling(currentRoomCode.value, false, true);
                   }
-                }, 2000);
+                }, delay);
+              } else {
+                console.error('Max reconnection attempts reached. Stopped reconnecting.');
+                showToast('信令服务连接断开，已停止自动重试');
               }
             };
 
             ws.onerror = (e) => {
+              isConnecting.value = false;
               console.error('Signaling WebSocket error:', e);
             };
           };
@@ -680,11 +733,20 @@
         // 断开连接
         const disconnectSession = () => {
           isExplicitlyDisconnected = true;
+          clearReconnectTimer();
           stopWsHeartbeat();
           releaseWakeLock();
           if (rtc) rtc.destroy();
-          if (ws) ws.close();
+          if (ws) {
+            ws.onopen = null;
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
+            try { ws.close(); } catch (_) {}
+            ws = null;
+          }
           isConnected.value = false;
+          isConnecting.value = false;
           createNewRoom();
           showToast('会话已结束');
         };
