@@ -363,13 +363,7 @@
           });
         };
 
-        // 信令通道连接
-        const connectSignaling = (roomId, isRoomCreator = false) => {
-          if (ws) {
-            try { ws.close(); } catch (_) {}
-          }
-
-          let isExplicitlyDisconnected = false;
+        let isExplicitlyDisconnected = false;
           let wsHeartbeatInterval = null;
 
           const startWsHeartbeat = () => {
